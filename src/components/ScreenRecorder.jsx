@@ -387,7 +387,6 @@ const ScreenRecorder = () => {
 
             workerRef.current.postMessage({ action: 'setFps', fps: 30 });
             workerRef.current.postMessage({ action: 'start' });
-            console.log('Background Heartbeat: Online');
         }
     }, [cameraStream, activeBg, screenScale, recordingQuality, renderFrame]);
 

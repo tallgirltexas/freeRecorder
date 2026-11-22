@@ -22,7 +22,6 @@ export const useRecording = ({
 
 
     const startRecording = useCallback(async () => {
-        console.log('Attempting to start recording...');
         if (isStartingRef.current) return;
         isStartingRef.current = true;
 
@@ -39,23 +38,19 @@ export const useRecording = ({
 
             setStatus('initializing');
 
-            console.log('Finalizing stream for MediaRecorder...');
             const tracks = [];
 
             // Case A: Webcam is active OR Background/Frame is active OR Non-Native Scaling (requires canvas)
             const useCanvas = cameraStream || activeBg !== 'none' || (screenScale && screenScale < 1.0) || recordingQuality !== 'native';
-            console.log('Use Canvas:', useCanvas, { cameraStream, activeBg, screenScale, recordingQuality });
 
             if (useCanvas) {
                 if (!canvasRef.current) throw new Error('Canvas not found');
                 const canvasStream = canvasRef.current.captureStream(30);
                 tracks.push(...canvasStream.getVideoTracks());
-                console.log('Using Canvas Mode for recording');
             }
             // Case B: Screen only (Direct mode for better performance)
             else if (screenStream) {
                 tracks.push(...screenStream.getVideoTracks());
-                console.log('Using Direct Mode for recording');
             }
 
             // Add Audio track if available
@@ -63,7 +58,6 @@ export const useRecording = ({
                 const audioTrack = audioStream.getAudioTracks()[0];
                 if (audioTrack) {
                     tracks.push(audioTrack);
-                    console.log('Added audio track to recording');
                 }
             }
 
@@ -74,7 +68,6 @@ export const useRecording = ({
             // Select MIME type: preference first, then fallback to WebM
             let finalMimeType = '';
             const hasAudio = tracks.some(t => t.kind === 'audio');
-            console.log('Recording has audio:', hasAudio);
 
             if (preferredMimeType && MediaRecorder.isTypeSupported(preferredMimeType)) {
                 finalMimeType = preferredMimeType;
@@ -96,7 +89,6 @@ export const useRecording = ({
                 finalMimeType = finalMimeType.replace(',aac', '');
             }
 
-            console.log('Selected MIME Type:', finalMimeType);
 
             let mediaRecorder;
             try {
@@ -139,7 +131,6 @@ export const useRecording = ({
             mediaRecorder.onstop = async () => {
                 setStatus('processing');
                 const chunks = chunksRef.current;
-                console.log(`Recording stopped. Total chunks: ${chunks.length}`);
 
                 if (chunks.length > 0) {
                     const blob = new Blob(chunks, { type: finalMimeType });
