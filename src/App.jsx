@@ -6,7 +6,6 @@ import BlogList from './components/Blog/BlogList';
 import BlogPost from './components/Blog/BlogPost';
 import ComparisonPage from './components/Marketing/ComparisonPage';
 import { PrivacyPolicy, TermsOfService } from './components/Legal/LegalPages';
-import { Analytics } from '@vercel/analytics/react';
 import { ThemeProvider, useTheme } from './context/ThemeContext.jsx';
 import ThemeToggle from './components/ThemeToggle/ThemeToggle';
 import './index.css';
@@ -96,7 +95,6 @@ function App() {
               </>
             } />
           </Routes>
-          <Analytics />
         </div>
       </ThemeProvider>
     </Router>

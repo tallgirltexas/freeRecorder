@@ -6,7 +6,6 @@
   <p><b>100% Private, Local-First, and Browser-Based Screen Studio for High-End Creators.</b></p>
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
-  [![Vercel Analytics](https://img.shields.io/badge/Analytics-Vercel-black.svg)](https://gravityrecorder.com)
   [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-blue.svg)](CONTRIBUTING.md)
   [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)]()
 </div>
