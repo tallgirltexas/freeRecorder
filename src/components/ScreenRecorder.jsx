@@ -5,6 +5,7 @@ import { useStreams } from '../hooks/useStreams';
 import { useFileSystem } from '../hooks/useFileSystem';
 import { useRecording } from '../hooks/useRecording';
 import { EXPORT_FORMATS, getDefaultFormat } from '../constants/formats';
+import { downloadBlob, getUniqueFileName, sanitizeFileName } from '../utils/FileUtils';
 
 // UI Components
 import { ControlBar } from './Controls/ControlBar';
@@ -39,7 +40,7 @@ const ScreenRecorder = () => {
         try { const v = localStorage.getItem('gr_' + key); return v !== null ? JSON.parse(v) : fallback; } catch { return fallback; }
     };
     const saveSetting = (key, value) => {
-        try { localStorage.setItem('gr_' + key, JSON.stringify(value)); } catch {}
+        try { localStorage.setItem('gr_' + key, JSON.stringify(value)); } catch { /* storage full or blocked; settings just won't persist */ }
     };
 
     const [webcamShape, setWebcamShape] = useState(() => loadSetting('webcamShape', 'circle'));
@@ -76,11 +77,8 @@ const ScreenRecorder = () => {
 
     // Build a GainNode pipeline whenever the mic stream changes
     useEffect(() => {
-        if (audioCtxRef.current) {
-            audioCtxRef.current.close();
-            audioCtxRef.current = null;
-            gainNodeRef.current = null;
-        }
+        // The previous context is closed by this effect's cleanup below.
+        // Closing it here too threw an error on every mic change.
         setProcessedAudioStream(null);
         if (!audioStream) return;
 
@@ -95,7 +93,11 @@ const ScreenRecorder = () => {
         gain.connect(dest);
         setProcessedAudioStream(dest.stream);
 
-        return () => { ctx.close(); audioCtxRef.current = null; gainNodeRef.current = null; };
+        return () => {
+            if (ctx.state !== 'closed') ctx.close().catch(() => {});
+            audioCtxRef.current = null;
+            gainNodeRef.current = null;
+        };
     }, [audioStream]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => { if (gainNodeRef.current) gainNodeRef.current.gain.value = micVolume; }, [micVolume]);
@@ -105,15 +107,15 @@ const ScreenRecorder = () => {
     const {
         directoryHandle, setDirectoryHandle,
         isHandleAuthorized, setIsHandleAuthorized,
-        libraryFiles, setLibraryFiles,
-        thumbnailMap, setThumbnailMap,
+        libraryFiles,
+        thumbnailMap,
         editingFileName, setEditingFileName,
         newName, setNewName,
-        selectedVideoUrl, setSelectedVideoUrl,
+        selectedVideoUrl,
         connectFolder, resumeSync, syncLibrary,
-        playVideo, startRename, handleRename, deleteFile,
+        playVideo, closeVideo, startRename, handleRename, deleteFile,
         generateThumbnail, getThumbnailUrl
-    } = useFileSystem(showToast, setHighlightedFile);
+    } = useFileSystem(showToast);
 
     const handleRecordingComplete = useCallback((blob, mimeType) => {
         if (!blob) {
@@ -136,43 +138,55 @@ const ScreenRecorder = () => {
         onComplete: handleRecordingComplete
     });
 
-    const handleSaveRecording = async (blob, fileName) => {
+    const handleSaveRecording = async (blob, requestedName) => {
+        const fileName = sanitizeFileName(requestedName) || `recording-${Date.now()}.webm`;
+        let saved = false;
+
         if (directoryHandle) {
             try {
-                const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
+                // Never overwrite an existing recording. If the name is taken,
+                // save as "name (2).webm" and say so.
+                const finalName = await getUniqueFileName(directoryHandle, fileName);
+                const fileHandle = await directoryHandle.getFileHandle(finalName, { create: true });
                 const writable = await fileHandle.createWritable();
                 await writable.write(blob);
                 await writable.close();
+                saved = true;
 
                 await syncLibrary(directoryHandle);
-                showToast(`Saved to ${directoryHandle.name}`, fileName, 'success');
-                setHighlightedFile(fileName);
+                if (finalName !== fileName) {
+                    showToast('Saved under a new name', `"${fileName}" already existed, so this was saved as "${finalName}".`, 'info');
+                } else {
+                    showToast(`Saved to ${directoryHandle.name}`, finalName, 'success');
+                }
+                setHighlightedFile(finalName);
 
                 // Background thumbnail generation to prevent UI block
-                generateThumbnail(blob, fileName, directoryHandle).then(() => {
+                generateThumbnail(blob, finalName, directoryHandle).then(() => {
                     syncLibrary(directoryHandle);
                 });
 
                 setTimeout(() => setHighlightedFile(null), 5000);
             } catch (err) {
                 console.error('Save failed:', err);
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = fileName;
-                a.click();
-                URL.revokeObjectURL(url);
+                downloadBlob(blob, fileName);
+                saved = true;
                 showToast('Direct save failed', 'Download triggered as fallback', 'error');
             }
         } else {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = fileName;
-            a.click();
-            URL.revokeObjectURL(url);
+            downloadBlob(blob, fileName);
+            saved = true;
             showToast('Recording Saved', 'Check your downloads folder', 'success');
         }
+
+        // The recording is safely out of the browser, so the crash-recovery copy can go
+        if (saved) await storageManager.clearStorage().catch(() => {});
+        setPendingRecording(null);
+    };
+
+    const handleDiscardRecording = async () => {
+        if (!window.confirm('Discard this recording? It cannot be recovered.')) return;
+        await storageManager.clearStorage().catch(() => {});
         setPendingRecording(null);
     };
 
@@ -182,6 +196,9 @@ const ScreenRecorder = () => {
     const dragOffset = useRef({ x: 0, y: 0 });
     const drawTimerRef = useRef(null);
     const countdownTimerRef = useRef(null);
+
+    // Holds the latest handleStopAll so the unmount cleanup below can call it
+    const handleStopAllRef = useRef(null);
 
     // Initialize hidden video elements
     useEffect(() => {
@@ -195,7 +212,7 @@ const ScreenRecorder = () => {
         cameraVideoRef.current.autoplay = true;
         cameraVideoRef.current.playsInline = true;
 
-        return () => handleStopAll();
+        return () => handleStopAllRef.current?.();
     }, []);
 
     const handleStopAll = () => {
@@ -207,10 +224,10 @@ const ScreenRecorder = () => {
         setActiveBg('none');
         setScreenScale(1.0);
     };
+    useEffect(() => { handleStopAllRef.current = handleStopAll; });
 
     const [currentDimensions, setCurrentDimensions] = useState({ width: 0, height: 0 });
 
-    const lastDrawTimeRef = useRef(0);
 
     // 1. Sync Canvas Dimensions (Logic only runs when streams/quality change)
     useEffect(() => {
@@ -439,6 +456,50 @@ const ScreenRecorder = () => {
         loadSavedState();
     }, [setDirectoryHandle, setIsHandleAuthorized]);
 
+    // Crash recovery: if the last session ended before a recording was saved
+    // or discarded, rebuild it from the backup and offer to save it.
+    useEffect(() => {
+        let cancelled = false;
+        const checkForUnsavedRecording = async () => {
+            try {
+                const chunks = await storageManager.getAllChunks();
+                if (cancelled || !chunks || chunks.length === 0) return;
+                const mimeType = (await storageManager.getSetting('recovery_mime')) || 'video/webm';
+                const blob = new Blob(chunks, { type: mimeType });
+                if (!cancelled) setPendingRecording({ blob, mimeType, recovered: true });
+            } catch (err) {
+                console.warn('Crash recovery check failed:', err);
+            }
+        };
+        checkForUnsavedRecording();
+        return () => { cancelled = true; };
+    }, []);
+
+    // Warn before closing the tab while recording or with an unsaved recording
+    useEffect(() => {
+        if (!isRecording && !pendingRecording) return;
+        const onBeforeUnload = (e) => {
+            e.preventDefault();
+            e.returnValue = '';
+        };
+        window.addEventListener('beforeunload', onBeforeUnload);
+        return () => window.removeEventListener('beforeunload', onBeforeUnload);
+    }, [isRecording, pendingRecording]);
+
+    // If screen sharing ends mid-recording (the browser's "Stop sharing" button)
+    // and there's no camera, stop and save instead of recording a frozen screen.
+    useEffect(() => {
+        if (!isRecording || !screenStream || cameraStream) return;
+        const track = screenStream.getVideoTracks()[0];
+        if (!track) return;
+        const onEnded = () => {
+            showToast('Screen sharing ended', 'The recording was stopped so you can save it.', 'info');
+            stopRecording();
+        };
+        track.addEventListener('ended', onEnded);
+        return () => track.removeEventListener('ended', onEnded);
+    }, [isRecording, screenStream, cameraStream, stopRecording, showToast]);
+
     useEffect(() => {
         if (isHistoryOpen && directoryHandle && !isRecording) {
             syncLibrary(directoryHandle);
@@ -484,7 +545,12 @@ const ScreenRecorder = () => {
     // Keyboard shortcuts
     useEffect(() => {
         const onKey = (e) => {
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            // Ignore Ctrl/Cmd/Alt combos (Ctrl+C used to toggle the camera)
+            // and typing in any form field or editable area.
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            const tag = e.target.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable) return;
+            if (pendingRecording) return; // save dialog is open
             if (e.code === 'Space' && isRecording) {
                 e.preventDefault();
                 isPaused ? resumeRecording() : pauseRecording();
@@ -499,7 +565,7 @@ const ScreenRecorder = () => {
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [isRecording, isPaused, pauseRecording, resumeRecording, stopRecording, toggleScreen, toggleCamera]);
+    }, [isRecording, isPaused, pendingRecording, pauseRecording, resumeRecording, stopRecording, toggleScreen, toggleCamera]);
 
     const isLaunchingRef = useRef(false);
 
@@ -629,7 +695,7 @@ const ScreenRecorder = () => {
 
             <VideoPlayerModal
                 url={selectedVideoUrl}
-                onClose={() => setSelectedVideoUrl(null)}
+                onClose={closeVideo}
             />
 
             <Toast
@@ -641,7 +707,8 @@ const ScreenRecorder = () => {
                 blob={pendingRecording?.blob}
                 mimeType={pendingRecording?.mimeType}
                 onSave={handleSaveRecording}
-                onDiscard={() => setPendingRecording(null)}
+                onDiscard={handleDiscardRecording}
+                recovered={pendingRecording?.recovered}
             />
         </div>
     );

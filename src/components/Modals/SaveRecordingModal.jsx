@@ -1,34 +1,51 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-const SaveRecordingModal = ({ blob, mimeType, onSave, onDiscard }) => {
+const getExtension = (mimeType = '') => {
+    if (mimeType.includes('mp4')) return '.mp4';
+    if (mimeType.includes('matroska') || mimeType.includes('mkv')) return '.mkv';
+    return '.webm';
+};
+
+const defaultName = () => {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return `recording-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+};
+
+const SaveRecordingModal = ({ blob, mimeType, onSave, onDiscard, recovered = false }) => {
     const [fileName, setFileName] = useState('');
-    const [extension, setExtension] = useState('.webm');
+    const [isSaving, setIsSaving] = useState(false);
+    const extension = getExtension(mimeType);
 
-    useEffect(() => {
-        if (blob) {
-            let ext = '.webm';
-            if (mimeType.includes('mp4')) ext = '.mp4';
-            else if (mimeType.includes('matroska') || mimeType.includes('mkv')) ext = '.mkv';
-
-            setExtension(ext);
-            setFileName(`recording-${new Date().toLocaleDateString().replace(/\//g, '-')}-${new Date().toLocaleTimeString().replace(/:/g, '-').split(' ')[0]}`);
-        }
-    }, [blob, mimeType]);
+    // Fill in a fresh default name each time a new recording arrives
+    const [lastBlob, setLastBlob] = useState(null);
+    if (blob && blob !== lastBlob) {
+        setLastBlob(blob);
+        setFileName(recovered ? `recovered-${defaultName()}` : defaultName());
+        setIsSaving(false);
+    }
 
     if (!blob) return null;
 
-    const handleConfirm = () => {
-        if (!fileName.trim()) return;
+    const handleConfirm = async () => {
+        if (!fileName.trim() || isSaving) return;
+        setIsSaving(true); // blocks double-clicks from saving twice
         const finalName = fileName.endsWith(extension) ? fileName : fileName + extension;
-        onSave(blob, finalName);
+        try {
+            await onSave(blob, finalName);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     return (
         <div className="modal-overlay">
             <div className="modal-content" style={{ maxWidth: '450px', padding: '2.5rem' }}>
-                <h2 style={{ marginBottom: '1rem', fontSize: '1.75rem', fontWeight: 800 }}>Save Recording? 🎥</h2>
+                <h2 style={{ marginBottom: '1rem', fontSize: '1.75rem', fontWeight: 800 }}>{recovered ? 'Unsaved recording found' : 'Save Recording? 🎥'}</h2>
                 <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', lineHeight: '1.5' }}>
-                    Great recording! Give it a name before we save it to your workspace.
+                    {recovered
+                        ? 'Your last recording was not saved before the page closed. Save it now, or discard it.'
+                        : 'Great recording! Give it a name before we save it to your workspace.'}
                 </p>
 
                 <div className="input-group" style={{ marginBottom: '2.5rem' }}>
@@ -79,10 +96,10 @@ const SaveRecordingModal = ({ blob, mimeType, onSave, onDiscard }) => {
                     <button
                         className="btn btn-primary"
                         onClick={handleConfirm}
-                        disabled={!fileName.trim()}
+                        disabled={!fileName.trim() || isSaving}
                         style={{ flex: 2, padding: '1rem', justifyContent: 'center' }}
                     >
-                        Save Recording
+                        {isSaving ? 'Saving…' : 'Save Recording'}
                     </button>
                 </div>
             </div>

@@ -68,3 +68,49 @@
 
 - npm audit still reports findings in the remaining dependency tree. Dependency upgrades were outside Phase 1.
 - ESLint flags the recorder teardown effect and save dialog initialization. Both belong to existing code.
+
+---
+
+# Phase 2 handoff
+
+## Done
+
+1. **Save and rename can no longer lose recordings** (`src/utils/FileUtils.js`, `useFileSystem.js`, `ScreenRecorder.jsx`)
+   - Saving never overwrites. If the name is taken, the file is saved as `name (2).webm` and a message says so.
+   - Renaming refuses to overwrite another file and keeps the name box open.
+   - Case-only renames (`demo` to `Demo`) go through a temporary name, so Mac and Windows no longer delete the file.
+   - The copy fallback checks the copy's size before removing the original.
+   - File names are cleaned of characters Windows and macOS reject.
+   - The Save button can't be double-clicked into two saves. Discard asks for confirmation.
+2. **Crash recovery is on** (`useRecording.js`, `ScreenRecorder.jsx`, `SaveRecordingModal.jsx`)
+   - Each 1-second chunk is also written to IndexedDB during recording.
+   - On page load, an unsaved recording is rebuilt and offered in an "Unsaved recording found" dialog.
+   - The backup is cleared only after a successful save or a confirmed discard.
+   - The browser warns before closing the tab while recording or with an unsaved recording.
+3. **Smaller fixes**
+   - Library sync no longer stays locked when folder permission is missing.
+   - Keyboard shortcuts ignore Ctrl/Cmd/Alt combos, dropdowns, editable areas, and the open save dialog.
+   - Video player and thumbnail memory links are released.
+   - Fallback downloads release their link after 60 seconds instead of immediately.
+   - The mic volume pipeline no longer closes its audio context twice.
+   - If screen sharing ends mid-recording with no camera, the recording stops and opens the save dialog.
+   - Video files with uppercase extensions (`.MP4`) now show in the library.
+   - Fallback alerts in file playback were replaced with toasts.
+4. **Lint cleanup**: unused imports and variables removed, and the unmount cleanup now calls the latest stop function.
+
+## Verification
+
+- `npm run build` passes.
+- `npm run lint`: 4 findings remain (was 16). Three are `set-state-in-effect` style warnings in effects that existed before, and one is the ThemeContext fast-refresh warning. None affect behavior.
+- Rename and naming logic was tested against a simulated case-insensitive folder, with and without native `move()`. All cases passed.
+- Not tested here: live recording, camera, mic, and real disk writes. See the manual checklist.
+
+## Manual test checklist (Chrome or Edge, about 10 minutes)
+
+1. Connect a folder, record a 10-second clip, and save it as `test`.
+2. Record again and save as `test`. Expect `test (2).webm` and a message.
+3. Rename `test` to `Test`. The file should still be there and play.
+4. Rename `Test` to `test (2)`. Expect a "already exists" message, with both files intact.
+5. Start a recording, wait 10 seconds, and close the tab (accept the warning). Reopen `/recorder`. Expect "Unsaved recording found". Save it and play it.
+6. Press Ctrl+C on the recorder page. The camera should not toggle.
+7. Start a screen-only recording and click the browser's "Stop sharing". Expect the save dialog.

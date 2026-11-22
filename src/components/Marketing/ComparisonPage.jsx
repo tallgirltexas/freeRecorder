@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getCompetitorData } from '../../services/ComparisonService';
 import SEO from '../SEO/SEO';

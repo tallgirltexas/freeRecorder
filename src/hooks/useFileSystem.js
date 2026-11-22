@@ -1,8 +1,8 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { storageManager } from '../utils/StorageManager';
-import { getFileSignature } from '../utils/FileUtils';
+import { getFileSignature, safeRename, sanitizeFileName } from '../utils/FileUtils';
 
-export const useFileSystem = (showToast, setHighlightedFile) => {
+export const useFileSystem = (showToast) => {
     const [directoryHandle, setDirectoryHandle] = useState(null);
     const [isHandleAuthorized, setIsHandleAuthorized] = useState(false);
     const [libraryFiles, setLibraryFiles] = useState([]);
@@ -95,16 +95,18 @@ export const useFileSystem = (showToast, setHighlightedFile) => {
         if (isSyncingRef.current) return;
         isSyncingRef.current = true;
 
-        const permission = await handle.queryPermission({ mode: 'readwrite' });
-        if (permission !== 'granted') {
-            setIsHandleAuthorized(false);
-            return;
-        }
-
         const files = [];
         try {
+            // The lock is released in finally, including when permission is missing.
+            // Before, an early return here left the library stuck until a page reload.
+            const permission = await handle.queryPermission({ mode: 'readwrite' });
+            if (permission !== 'granted') {
+                setIsHandleAuthorized(false);
+                return;
+            }
+
             for await (const entry of handle.values()) {
-                if (entry.kind === 'file' && (entry.name.endsWith('.webm') || entry.name.endsWith('.mp4') || entry.name.endsWith('.mkv'))) {
+                if (entry.kind === 'file' && /\.(webm|mp4|mkv)$/i.test(entry.name) && !entry.name.startsWith('.')) {
                     const file = await entry.getFile();
                     files.push({
                         name: entry.name,
@@ -164,12 +166,33 @@ export const useFileSystem = (showToast, setHighlightedFile) => {
         try {
             const file = await fileEntry.getFile();
             const url = URL.createObjectURL(file);
-            setSelectedVideoUrl(url);
-        } catch (err) {
-            alert('File not found. It may have been moved or deleted.');
+            setSelectedVideoUrl(prev => {
+                if (prev) URL.revokeObjectURL(prev);
+                return url;
+            });
+        } catch {
+            showToast('File not found', 'It may have been moved or deleted.', 'error');
             syncLibrary();
         }
     };
+
+    // Release the video's memory link when the player closes
+    const closeVideo = () => {
+        setSelectedVideoUrl(prev => {
+            if (prev) URL.revokeObjectURL(prev);
+            return null;
+        });
+    };
+
+    // Release all thumbnail and player links when the recorder page unmounts
+    const thumbnailMapRef = useRef(thumbnailMap);
+    const selectedVideoUrlRef = useRef(selectedVideoUrl);
+    useEffect(() => { thumbnailMapRef.current = thumbnailMap; }, [thumbnailMap]);
+    useEffect(() => { selectedVideoUrlRef.current = selectedVideoUrl; }, [selectedVideoUrl]);
+    useEffect(() => () => {
+        Object.values(thumbnailMapRef.current).forEach(url => URL.revokeObjectURL(url));
+        if (selectedVideoUrlRef.current) URL.revokeObjectURL(selectedVideoUrlRef.current);
+    }, []);
 
     const startRename = (e, file) => {
         e.stopPropagation();
@@ -180,79 +203,62 @@ export const useFileSystem = (showToast, setHighlightedFile) => {
     const handleRename = async (e, fileHandle) => {
         e.stopPropagation();
         const oldName = fileHandle.name;
-        if (!newName || newName === oldName) {
+
+        // 1. Clean the new name and keep the original extension
+        let finalName = sanitizeFileName(newName);
+        if (!finalName) {
+            showToast('Rename failed', 'Please enter a file name.', 'error');
+            return;
+        }
+        const ext = oldName.includes('.') ? oldName.split('.').pop() : '';
+        if (ext && !finalName.toLowerCase().endsWith(`.${ext.toLowerCase()}`)) {
+            finalName += `.${ext}`;
+        }
+        if (finalName === oldName) {
             setEditingFileName(null);
             return;
         }
 
-        const performManualMove = async (handle, name, targetDir) => {
-            const newHandle = await targetDir.getFileHandle(name, { create: true });
-            const writable = await newHandle.createWritable();
-            const file = await handle.getFile();
-            await writable.write(file);
-            await writable.close();
-            await targetDir.removeEntry(handle.name);
-            return newHandle;
-        };
-
         try {
-            // 1. Prepare new filename with extension
-            let finalName = newName;
-            const ext = oldName.split('.').pop();
-            if (!finalName.toLowerCase().endsWith(`.${ext.toLowerCase()}`)) {
-                finalName += `.${ext}`;
-            }
-
-            // 2. Perform Rename
-            try {
-                if (typeof fileHandle.move === 'function') {
-                    await fileHandle.move(finalName);
-                } else {
-                    throw new Error('MOVE_UNSUPPORTED');
-                }
-            } catch (moveErr) {
-                console.warn('Native move() failed or unsupported, using copy fallback:', moveErr);
-                await performManualMove(fileHandle, finalName, directoryHandle);
-            }
-
-            // 3. Rename Thumbnail if exists
-            try {
-                const assetsHandle = await directoryHandle.getDirectoryHandle('.recorder_assets');
-                const oldThumbName = oldName.replace(/\.[^/.]+$/, "") + ".jpg";
-                const newThumbName = finalName.replace(/\.[^/.]+$/, "") + ".jpg";
-
-                if (thumbnailMap[oldName]) {
-                    URL.revokeObjectURL(thumbnailMap[oldName]);
-                }
-
-                try {
-                    const oldThumbHandle = await assetsHandle.getFileHandle(oldThumbName);
-                    try {
-                        if (typeof oldThumbHandle.move === 'function') {
-                            await oldThumbHandle.move(newThumbName);
-                        } else {
-                            throw new Error('MOVE_UNSUPPORTED');
-                        }
-                    } catch {
-                        await performManualMove(oldThumbHandle, newThumbName, assetsHandle);
-                    }
-
-                    setThumbnailMap(prev => {
-                        const next = { ...prev };
-                        delete next[oldName];
-                        return next;
-                    });
-                } catch { /* No thumbnail */ }
-            } catch (err) {
-                console.warn('Thumbnail rename context error:', err);
-            }
-
-            setEditingFileName(null);
-            syncLibrary();
+            // 2. Rename the video. safeRename refuses to overwrite another file
+            // and handles case-only changes without deleting the original.
+            await safeRename(directoryHandle, fileHandle, finalName);
         } catch (err) {
             console.error('Rename failed:', err);
-            showToast('Error', `Rename failed: ${err.message}`, 'error');
+            const message = err.code === 'EXISTS'
+                ? `${err.message} Pick a different name.`
+                : `Rename failed: ${err.message}`;
+            showToast('Rename failed', message, 'error');
+            syncLibrary();
+            return; // keep the name box open so the user can fix it
         }
+
+        // 3. Rename the thumbnail if there is one. Failures here only cost a thumbnail,
+        // which is regenerated the next time the library loads.
+        try {
+            const assetsHandle = await directoryHandle.getDirectoryHandle('.recorder_assets');
+            const oldThumbName = oldName.replace(/\.[^/.]+$/, '') + '.jpg';
+            const newThumbName = finalName.replace(/\.[^/.]+$/, '') + '.jpg';
+            const oldThumbHandle = await assetsHandle.getFileHandle(oldThumbName).catch(() => null);
+            if (oldThumbHandle) {
+                await safeRename(assetsHandle, oldThumbHandle, newThumbName);
+            }
+        } catch (err) {
+            console.warn('Thumbnail rename skipped:', err);
+        }
+
+        if (thumbnailMap[oldName]) {
+            URL.revokeObjectURL(thumbnailMap[oldName]);
+            setThumbnailMap(prev => {
+                const next = { ...prev };
+                delete next[oldName];
+                return next;
+            });
+        }
+
+        setEditingFileName(null);
+        showToast('Renamed', finalName, 'success');
+        syncLibrary();
     };
 
     const deleteFile = async (file) => {
@@ -295,7 +301,7 @@ export const useFileSystem = (showToast, setHighlightedFile) => {
         newName, setNewName,
         selectedVideoUrl, setSelectedVideoUrl,
         connectFolder, resumeSync, syncLibrary,
-        playVideo, startRename, handleRename, deleteFile,
+        playVideo, closeVideo, startRename, handleRename, deleteFile,
         generateThumbnail, getThumbnailUrl
     };
 };

@@ -1,19 +1,17 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import ScreenRecorder from './components/ScreenRecorder';
 import LandingPage from './components/LandingPage/LandingPage';
 import BlogList from './components/Blog/BlogList';
 import BlogPost from './components/Blog/BlogPost';
 import ComparisonPage from './components/Marketing/ComparisonPage';
 import { PrivacyPolicy, TermsOfService } from './components/Legal/LegalPages';
-import { ThemeProvider, useTheme } from './context/ThemeContext.jsx';
+import { ThemeProvider } from './context/ThemeContext.jsx';
 import ThemeToggle from './components/ThemeToggle/ThemeToggle';
 import './index.css';
 
 const NavigationHeader = () => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const isBlogPage = location.pathname.startsWith('/blog');
 
   return (
     <header style={{

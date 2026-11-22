@@ -19,6 +19,10 @@ export const useRecording = ({
     const mediaRecorderRef = useRef(null);
     const chunksRef = useRef([]);
     const isStartingRef = useRef(false);
+    // Each chunk is also written to IndexedDB so a crash or closed tab doesn't lose
+    // the recording. Writes are chained so they land in order and can be awaited.
+    const saveQueueRef = useRef(Promise.resolve());
+    const backupFailedRef = useRef(false);
 
 
     const startRecording = useCallback(async () => {
@@ -117,9 +121,27 @@ export const useRecording = ({
 
             chunksRef.current = [];
 
+            // Start a fresh crash-recovery copy. Any older unsaved recording was
+            // already offered for recovery when the page loaded.
+            backupFailedRef.current = false;
+            saveQueueRef.current = storageManager.clearStorage()
+                .then(() => storageManager.setSetting('recovery_mime', finalMimeType))
+                .catch(err => {
+                    backupFailedRef.current = true;
+                    console.warn('Crash recovery unavailable:', err);
+                });
+
             mediaRecorder.ondataavailable = (e) => {
                 if (e.data && e.data.size > 0) {
                     chunksRef.current.push(e.data);
+                    if (!backupFailedRef.current) {
+                        saveQueueRef.current = saveQueueRef.current
+                            .then(() => storageManager.saveChunk(e.data))
+                            .catch(err => {
+                                backupFailedRef.current = true;
+                                console.warn('Crash recovery backup stopped (disk full?):', err);
+                            });
+                    }
                 }
             };
 
@@ -130,6 +152,9 @@ export const useRecording = ({
 
             mediaRecorder.onstop = async () => {
                 setStatus('processing');
+                // Let the last backup writes finish so they can't land after the
+                // backup is cleared on save.
+                await saveQueueRef.current.catch(() => {});
                 const chunks = chunksRef.current;
 
                 if (chunks.length > 0) {

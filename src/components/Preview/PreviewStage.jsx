@@ -8,8 +8,6 @@ const formatDuration = (seconds) => {
 
 export const PreviewStage = ({
     canvasRef,
-    screenVideoRef,
-    cameraVideoRef,
     cameraStream,
     screenStream,
     activeBg,
