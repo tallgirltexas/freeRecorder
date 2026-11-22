@@ -3,7 +3,6 @@ import { storageManager } from '../utils/StorageManager';
 import { BACKGROUND_PRESETS } from '../constants/backgrounds';
 import { useStreams } from '../hooks/useStreams';
 import { useFileSystem } from '../hooks/useFileSystem';
-import { useGoogleSync } from '../hooks/useGoogleSync';
 import { useRecording } from '../hooks/useRecording';
 import { EXPORT_FORMATS, getDefaultFormat } from '../constants/formats';
 
@@ -115,12 +114,6 @@ const ScreenRecorder = () => {
         playVideo, startRename, handleRename, deleteFile,
         generateThumbnail, getThumbnailUrl
     } = useFileSystem(showToast, setHighlightedFile);
-
-    const {
-        googleToken, cloudUser, cloudRegistry, uploadProgress,
-        handleGoogleAuth, handleLogout, uploadToDrive, auditCloudRegistry,
-        loadCloudMetadata, saveCloudMetadata
-    } = useGoogleSync(showToast, directoryHandle);
 
     const handleRecordingComplete = useCallback((blob, mimeType) => {
         if (!blob) {
@@ -449,9 +442,9 @@ const ScreenRecorder = () => {
 
     useEffect(() => {
         if (isHistoryOpen && directoryHandle && !isRecording) {
-            syncLibrary(directoryHandle, { googleToken, auditCloudRegistry, loadCloudMetadata });
+            syncLibrary(directoryHandle);
         }
-    }, [isHistoryOpen, directoryHandle, isRecording, googleToken, auditCloudRegistry, loadCloudMetadata, syncLibrary]);
+    }, [isHistoryOpen, directoryHandle, isRecording, syncLibrary]);
 
     // Persist settings to localStorage whenever they change
     useEffect(() => { saveSetting('webcamShape', webcamShape); }, [webcamShape]);
@@ -616,9 +609,6 @@ const ScreenRecorder = () => {
             <HistorySidebar
                 isHistoryOpen={isHistoryOpen}
                 setIsHistoryOpen={setIsHistoryOpen}
-                cloudUser={cloudUser}
-                handleGoogleAuth={handleGoogleAuth}
-                handleLogout={handleLogout}
                 directoryHandle={directoryHandle}
                 isHandleAuthorized={isHandleAuthorized}
                 connectFolder={connectFolder}
@@ -634,9 +624,6 @@ const ScreenRecorder = () => {
                 setNewName={setNewName}
                 handleRename={handleRename}
                 setEditingFileName={setEditingFileName}
-                uploadProgress={uploadProgress}
-                cloudRegistry={cloudRegistry}
-                uploadToDrive={uploadToDrive}
                 startRename={startRename}
                 deleteFile={deleteFile}
             />

@@ -39,7 +39,7 @@ const LandingPage = () => {
     const faqs = [
         {
             q: "Is Gravity Recorder really free?",
-            a: "Yes, 100%. Gravity is a fully open-source project with no paywalls, no 'Pro' plans, and no hidden subscriptions. Everything—from 2K recording to cloud sync—is available for free from the moment you launch the studio."
+            a: "Yes, 100%. Gravity is a fully open-source project with no paywalls, no 'Pro' plans, and no hidden subscriptions. 2K recording and the other studio features are available for free."
         },
         {
             q: "Is there a recording limit?",
@@ -55,7 +55,7 @@ const LandingPage = () => {
         },
         {
             q: "How does the local privacy work?",
-            a: "Unlike Loom or Tella, Gravity saves your videos directly to your local workspace using the File System Access API. This gives you absolute privacy and control over your data; your videos never leave your machine unless you choose to upload them to Google Drive."
+            a: "Unlike Loom or Tella, Gravity saves your videos directly to your local workspace using the File System Access API. This gives you absolute privacy and control over your data. Your recordings stay on your device."
         }
     ];
 

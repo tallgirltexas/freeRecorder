@@ -90,16 +90,10 @@ export const useFileSystem = (showToast, setHighlightedFile) => {
         }
     };
 
-    const syncLibrary = useCallback(async (handle = directoryHandle, googleOps = {}) => {
+    const syncLibrary = useCallback(async (handle = directoryHandle) => {
         if (!handle) return;
         if (isSyncingRef.current) return;
         isSyncingRef.current = true;
-
-        // Note: googleOps will be used in Phase 4 for cloud audit integration
-        if (googleOps.loadCloudMetadata) await googleOps.loadCloudMetadata(handle);
-        if (googleOps.auditCloudRegistry && googleOps.googleToken) {
-            googleOps.auditCloudRegistry(googleOps.googleToken);
-        }
 
         const permission = await handle.queryPermission({ mode: 'readwrite' });
         if (permission !== 'granted') {

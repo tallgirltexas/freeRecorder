@@ -1,11 +1,6 @@
-import React from 'react';
-
 export const HistorySidebar = ({
     isHistoryOpen,
     setIsHistoryOpen,
-    cloudUser,
-    handleGoogleAuth,
-    handleLogout,
     directoryHandle,
     isHandleAuthorized,
     connectFolder,
@@ -21,22 +16,9 @@ export const HistorySidebar = ({
     setNewName,
     handleRename,
     setEditingFileName,
-    uploadProgress,
-    cloudRegistry,
-    uploadToDrive,
     startRename,
     deleteFile
 }) => {
-    const [copiedFile, setCopiedFile] = React.useState(null);
-
-    const copyShareLink = (e, signature, fileName) => {
-        e.stopPropagation();
-        navigator.clipboard.writeText(cloudRegistry[signature].shareLink).then(() => {
-            setCopiedFile(fileName);
-            setTimeout(() => setCopiedFile(null), 2000);
-        });
-    };
-
     return (
         <div className={`sidebar ${isHistoryOpen ? 'open' : ''}`}>
             {isHistoryOpen && (
@@ -47,43 +29,6 @@ export const HistorySidebar = ({
                             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Files synced to disk</span>
                         </div>
                         <button className="btn-icon-bg" onClick={() => setIsHistoryOpen(false)}>✕</button>
-                    </div>
-
-                    {/* Cloud Hub Section */}
-                    <div className="cloud-hub glass-card" style={{ marginBottom: '1.5rem', padding: '1rem', background: 'var(--glass)' }}>
-                        {!cloudUser.isLoggedIn ? (
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                    <span style={{ fontSize: '1.2rem' }}>☁️</span>
-                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                        <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>Cloud Sync</span>
-                                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>Sign in to share links</span>
-                                    </div>
-                                </div>
-                                <button className="btn-small active" onClick={() => handleGoogleAuth(() => { })}>Connect</button>
-                            </div>
-                        ) : (
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                    {cloudUser.profile?.picture ? (
-                                        <img src={cloudUser.profile.picture} style={{ width: '32px', height: '32px', borderRadius: '50%', border: '1px solid var(--primary)' }} alt="" />
-                                    ) : (
-                                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem' }}>
-                                            {cloudUser.profile?.name?.[0] || 'U'}
-                                        </div>
-                                    )}
-                                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                                        <span style={{ fontSize: '0.8rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                            {cloudUser.profile?.name || 'User'}
-                                        </span>
-                                        <span style={{ fontSize: '0.65rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                                            ● <span style={{ color: 'var(--text-muted)' }}>Connected</span>
-                                        </span>
-                                    </div>
-                                </div>
-                                <button className="btn-small" onClick={handleLogout} style={{ opacity: 0.6, fontSize: '0.6rem' }}>Sign Out</button>
-                            </div>
-                        )}
                     </div>
 
                     {!directoryHandle ? (
@@ -149,33 +94,6 @@ export const HistorySidebar = ({
                                                         <div className="video-title-row">
                                                             <span className="video-title">{file.name}</span>
                                                             <div className="video-actions">
-                                                                {uploadProgress[file.name] !== undefined ? (
-                                                                    <span className="upload-progress-indicator" title="Uploading to Drive…">
-                                                                        <span className="upload-progress-dot"></span>
-                                                                        <span style={{ fontSize: '0.65rem', opacity: 0.7 }}>Uploading…</span>
-                                                                    </span>
-                                                                ) : cloudRegistry[file.signature] ? (
-                                                                    <>
-                                                                        <button
-                                                                            className="btn-cloud active"
-                                                                            onClick={(e) => copyShareLink(e, file.signature, file.name)}
-                                                                            title={copiedFile === file.name ? 'Copied!' : 'Copy share link'}
-                                                                            style={copiedFile === file.name ? { minWidth: '54px', fontSize: '0.6rem' } : {}}
-                                                                        >{copiedFile === file.name ? '✓ Copied' : '🔗'}</button>
-                                                                        <button
-                                                                            className="btn-cloud"
-                                                                            onClick={(e) => { e.stopPropagation(); window.open(cloudRegistry[file.signature].shareLink, '_blank'); }}
-                                                                            title="Open in new tab"
-                                                                            style={{ fontSize: '0.7rem', opacity: 0.6 }}
-                                                                        >↗</button>
-                                                                    </>
-                                                                ) : (
-                                                                    <button
-                                                                        className="btn-cloud"
-                                                                        onClick={(e) => { e.stopPropagation(); uploadToDrive(file.handle); }}
-                                                                        title="Upload to Google Drive"
-                                                                    >☁️</button>
-                                                                )}
                                                                 <button className="btn-rename" onClick={e => startRename(e, file)} title="Rename">✎</button>
                                                                 <button
                                                                     className="btn-delete"

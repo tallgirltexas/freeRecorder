@@ -829,73 +829,10 @@ body {
   color: #475569;
 }
 
-/* Cloud Sync UI */
 .video-actions {
   display: flex;
   gap: 0.5rem;
   align-items: center;
-}
-
-.btn-cloud {
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
-  color: var(--text-main);
-  border-radius: 6px;
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: all 0.2s;
-}
-
-[data-theme='light'] .btn-cloud {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-  color: #0f172a !important;
-}
-
-.btn-cloud:hover {
-  background: var(--glass-hover);
-  border-color: var(--primary);
-  color: var(--primary);
-  transform: translateY(-1px);
-}
-
-.btn-cloud.active {
-  background: rgba(46, 204, 113, 0.1);
-  border-color: var(--success);
-  color: var(--success);
-}
-
-[data-theme='light'] .btn-cloud.active {
-  background: #dcfce7;
-  border-color: #22c55e;
-  color: #15803d !important;
-}
-
-.upload-loader {
-  font-size: 0.9rem;
-  animation: pulseCloud 1.5s infinite;
-}
-
-@keyframes pulseCloud {
-  0% {
-    opacity: 0.4;
-    transform: scale(0.95);
-  }
-
-  50% {
-    opacity: 1;
-    transform: scale(1.05);
-  }
-
-  100% {
-    opacity: 0.4;
-    transform: scale(0.95);
-  }
 }
 
 /* Countdown Overlay */
@@ -978,26 +915,6 @@ body {
   0%   { background-position: 0% 50%; }
   50%  { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
-}
-
-/* Upload progress indicator */
-.upload-progress-indicator {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.65rem;
-  font-weight: 600;
-  color: var(--primary);
-  white-space: nowrap;
-}
-
-.upload-progress-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--primary);
-  animation: pulse 1.2s infinite;
-  flex-shrink: 0;
 }
 
 /* Keyboard shortcut hint */

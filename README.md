@@ -57,7 +57,6 @@ Most screen recorders require logins, upload your data to their servers, and hit
 - **🎨 Multi-Layer Gallery**: Overlay your webcam on your screen with real-time scaling and styling.
 - **🔳 Shape-Shifting Webcam**: Switch between Circle, Square, and Rounded patterns instantly.
 - **📍 Draggable Studio**: Move your webcam and UI elements anywhere on the canvas while recording.
-- **📂 Hybrid Cloud Sync**: Integrated with Google Drive API. Keep the source local, share the link in seconds.
 - **⚙️ Direct Hardware Access**: Zero-lag recording using direct-to-disk chunking via the File System Access API.
 
 ---
@@ -95,96 +94,10 @@ For those who want to test the latest experimental features or help us debug the
    npm install
    ```
 
-2. **Configure Environment Variables**:
-   - Copy the example environment file: `cp .env.example .env`
-   - Open `.env` and add your Google and Supabase credentials. (See "Setup Guides" below).
-
-3. **Launch Development**:
+2. **Launch Development**:
    ```bash
    npm run dev
    ```
-
----
-
-## 🔑 Google Cloud Setup (Step-by-Step)
-
-To enable the **Google Drive Cloud Sync** feature locally, you need to configure a Google Cloud Project. Follow these detailed steps:
-
-### 1. Create a Project
-- Go to the [Google Cloud Console](https://console.cloud.google.com/).
-- Click the project dropdown (top left) and select **New Project**.
-- Name it `Gravity Recorder` and click **Create**.
-
-### 2. Enable APIs
-- In the sidebar, go to **APIs & Services > Library**.
-- Search for **"Google Drive API"**.
-- Click on it and click **Enable**.
-
-### 3. Configure OAuth Consent Screen
-- Go to **APIs & Services > OAuth consent screen**.
-- Select **User Type: External** and click **Create**.
-- **App Information**: Enter `Gravity Recorder` as the app name and your email for support.
-- **Scopes**: 
-    - Click **Add or Remove Scopes**.
-    - Manually add this scope: `https://www.googleapis.com/auth/drive.file` (this allows Gravity to only see files it creates, maximizing user privacy).
-    - Add `.../auth/userinfo.profile` and `.../auth/userinfo.email` for the login feature.
-- **Test Users**: Add your own Gmail address so you can log in during development.
-
-### 4. Create Credentials
-- Go to **APIs & Services > Credentials**.
-
-#### Create OAuth Client ID (For Login/Sync):
-- Click **Create Credentials > OAuth client ID**.
-- Set **Application type** to `Web application`.
-- **Name**: `Gravity Local Dev`.
-- **Authorized JavaScript origins**: Add `http://localhost:5173`.
-- Click **Create** and copy your **Client ID**.
-
-#### Create API Key (For API access):
-- Click **Create Credentials > API Key**.
-- **Important**: To prevent unauthorized use, click **Edit API Key** and under **API restrictions**, select "Restrict key" and check **Google Drive API**.
-- Copy your **API Key**.
-
-### 5. Update your `.env`
-Paste both values into your `.env` file:
-```env
-VITE_GOOGLE_CLIENT_ID=your_id_here.apps.googleusercontent.com
-VITE_GOOGLE_API_KEY=your_key_here
-
-VITE_SUPABASE_URL=your_project_url_here
-VITE_SUPABASE_ANON_KEY=your_anon_key_here
-```
-
----
-
-## 🔐 Supabase Backend Setup
-
-While Gravity is **local-first**, we integrated a lightweight Supabase backend to solve a critical UX hurdle: **Google OAuth Token Expiration.**
-
-### 1. Why do we need a backend?
-Google’s security policy limits "Client-side" (Implicit) Access Tokens to exactly **1 hour**. For a screen recorder, this is a dealbreaker—your upload could fail mid-way if your session expires. 
-
-By using Supabase as our Auth provider, we can securely exchange a one-time code for a **Refresh Token**. Supabase handles the silent background rotation of your Google tokens, ensuring you stay logged in and your big 4K uploads never get interrupted.
-
-### 2. Why Supabase?
-- **Privacy-First Auth**: It allows us to keep your data on Google Drive while managing only the "keys" securely.
-- **Real-time Metadata**: It’s the fastest way to sync your recording library across devices without us ever touching your actual video files.
-
-### 3. Step-by-Step Local Setup
-1. **Create a Project**: Head to the [Supabase Dashboard](https://app.supabase.com/) and create a new project called `Gravity Recorder`.
-2. **Enable Google Auth**:
-    - Go to **Authentication > Providers > Google**.
-    - Toggle **Enabled**.
-    - Paste your `Client ID` and `Client Secret` (from your Google Cloud Console).
-    - **Crucial**: Copy the **Redirect URI** provided by Supabase and add it to your [Google Cloud Console](https://console.cloud.google.com/apis/credentials) under "Authorized redirect URIs".
-3. **Get your Keys**:
-    - Go to **Project Settings > API**.
-    - Copy your **Project URL** and **anon (public) key**.
-4. **Update `.env`**:
-    ```env
-    VITE_SUPABASE_URL=https://your-project.supabase.co
-    VITE_SUPABASE_ANON_KEY=your-long-anon-key-here
-    ```
 
 ---
 

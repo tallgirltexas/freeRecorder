@@ -32,20 +32,19 @@ export const PrivacyPolicy = () => (
             <p>Your privacy is important to us. This Privacy Policy explains how Gravity Recorder collects, uses, and protects your information.</p>
 
             <h3>1. Information We Collect</h3>
-            <p>Gravity Recorder is designed as a local-first application. Most of your recording data never leaves your computer.</p>
+            <p>Gravity Recorder is designed as a local-first application. Your recording data stays on your computer.</p>
             <ul>
-                <li><strong>Local Data:</strong> Videos, thumbnails, and metadata are stored locally on your device via the File System Access API.</li>
-                <li><strong>Google Account Data:</strong> If you enable Cloud Sync, we access your Google profile (email, name, picture) and create files in your Google Drive. We only access files created by this application.</li>
+                <li><strong>Local Data:</strong> Videos and thumbnails are stored locally on your device via the File System Access API.</li>
             </ul>
 
             <h3>2. How We Use Data</h3>
-            <p>We use your Google Account information solely to facilitate video uploads to your own Google Drive and to provide a personalized sync experience.</p>
+            <p>The app uses your local videos and thumbnails to display and play recordings in your library.</p>
 
             <h3>3. Data Retention</h3>
-            <p>We do not operate a centralized backend that stores your videos. Your data remains in your control on your local machine and your personal Google Drive.</p>
+            <p>We do not operate a centralized backend that stores your videos. Your data remains in your control on your local machine.</p>
 
             <h3>4. Security</h3>
-            <p>We use industry-standard authentication (Supabase & Google OAuth) to ensure your cloud connection is secure.</p>
+            <p>Your browser manages access to the workspace folder you select.</p>
         </section>
     </LegalLayout>
 );
